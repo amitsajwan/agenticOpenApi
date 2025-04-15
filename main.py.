@@ -1,23 +1,39 @@
-from fastapi import FastAPI
-from fastapi.websockets import WebSocket
+import os
+from fastapi import FastAPI, WebSocket
 from websocket_manager import WebSocketManager
 from agentic_api_planner import AgenticAPIPlanner
-from load_test import load_test
+from load_test import run_load_test
 
 app = FastAPI()
 ws_manager = WebSocketManager()
-api_planner = AgenticAPIPlanner()
+
+# Load configuration from env variables
+BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
+SPEC_PATH = os.getenv("SPEC_PATH", "specs/petstore.yaml")
+
+# Initialize the agentic planner with the spec file and base URL
+api_planner = AgenticAPIPlanner(openapi_spec_path=SPEC_PATH)
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await ws_manager.connect(websocket)
+    try:
+        while True:
+            # Receive message from user
+            data = await websocket.receive_text()
+            # Process data (e.g., command parsing) and send system response
+            await ws_manager.send_message(f"Received command: {data}")
+    except Exception as e:
+        await ws_manager.disconnect(websocket)
 
 @app.post("/plan_execution")
-async def plan_api_execution():
-    api_sequence = api_planner.generate_sequence()
-    return {"message": "API sequence generated", "sequence": api_sequence}
+async def plan_execution():
+    sequence = api_planner.generate_execution_plan()
+    return {"message": "API sequence generated", "sequence": sequence}
 
 @app.post("/load_test")
-async def perform_load_test(users: int = 10):
-    load_test(users=users)
-    return {"message": "Load test started"}
+async def load_test_endpoint(users: int = 10):
+    # Dispatch load test asynchronously
+    # run_load_test should be an async function for better integration
+    await run_load_test(users=users)
+    return {"message": "Load test initiated"}

@@ -1,87 +1,43 @@
 import time
 import requests
-from concurrent.futures import ThreadPoolExecutor
-from .state import State
+from state import State
 
 class APIExecutor:
-    def __init__(self, base_url, headers, langgraph, state=None):
+    def __init__(self, base_url, headers=None):
         self.base_url = base_url
-        self.headers = headers
-        self.langgraph = langgraph
-        self.state = state or State()
+        self.headers = headers or {"Content-Type": "application/json"}
+        self.state = State()
 
     def execute_api(self, method, path, payload=None):
-        """
-        Executes a single API call based on the HTTP method, path, and payload.
-
-        Args:
-        - method (str): The HTTP method (e.g., 'GET', 'POST').
-        - path (str): The API endpoint path.
-        - payload (dict, optional): The request payload for POST/PUT requests.
-
-        Returns:
-        - dict: The response data.
-        """
-        url = f"{self.base_url}{path}"
+        url = self.base_url + path
         response = None
+        try:
+            if method.upper() == "GET":
+                response = requests.get(url, headers=self.headers)
+            elif method.upper() == "POST":
+                response = requests.post(url, json=payload, headers=self.headers)
+            elif method.upper() == "PUT":
+                response = requests.put(url, json=payload, headers=self.headers)
+            elif method.upper() == "DELETE":
+                response = requests.delete(url, headers=self.headers)
+            if response.status_code < 300:
+                return response.json()
+            else:
+                raise Exception(f"Status {response.status_code}: {response.text}")
+        except Exception as e:
+            raise e
 
-        if method == "GET":
-            response = requests.get(url, headers=self.headers)
-        elif method == "POST":
-            response = requests.post(url, json=payload, headers=self.headers)
-        elif method == "PUT":
-            response = requests.put(url, json=payload, headers=self.headers)
-        elif method == "DELETE":
-            response = requests.delete(url, headers=self.headers)
-
-        if response.status_code in range(200, 299):
-            return response.json()  # Success
-        else:
-            return {"error": response.text, "status_code": response.status_code}
-
-    def run_single_api(self, api):
-        """
-        Executes a single API in the sequence, handles retries and updates state.
-
-        Args:
-        - api (dict): The API information (method, path, payload).
-
-        Returns:
-        - dict: The response from the API call.
-        """
-        response = None
+    def run_api_with_retries(self, method, path, payload=None, retries=3):
         attempt = 0
-        while attempt < 3:
+        while attempt < retries:
             try:
-                print(f"Executing API {api['method']} {api['path']} with payload: {api.get('payload')}")
-                response = self.execute_api(api['method'], api['path'], api.get('payload'))
-                
-                # Update state with the response if the API call was successful
-                if 'error' not in response:
-                    self.state.update_state(api['path'], response)
-                    print(f"API {api['method']} {api['path']} executed successfully.")
-                    break
+                result = self.execute_api(method, path, payload)
+                # Update state if API returns an ID
+                if isinstance(result, dict) and "id" in result:
+                    self.state.update_state(path, result)
+                return result
             except Exception as e:
-                print(f"Error executing {api['method']} {api['path']}: {e}")
-            
-            time.sleep(2 ** attempt)  # Exponential backoff
-            attempt += 1
-
-        return response
-
-    def run_parallel(self, api_sequence):
-        """
-        Runs the API sequence in parallel using a ThreadPoolExecutor.
-
-        Args:
-        - api_sequence (list): List of API calls to be executed.
-
-        Returns:
-        - list: Responses for each API call.
-        """
-        with ThreadPoolExecutor() as executor:
-            results = list(executor.map(self.run_single_api, api_sequence))
-        return results
-
-    def run_sequential(self, api_sequence):
-        """
+                print(f"Error calling {method} {path}: {e} (Attempt {attempt + 1}/{retries})")
+                time.sleep(2 ** attempt)
+                attempt += 1
+        return {"error": "Failed after retries"}

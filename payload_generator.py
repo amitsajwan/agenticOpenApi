@@ -1,46 +1,32 @@
 import openai
 import json
 
-# Set up OpenAI API key
 openai.api_key = "your-openai-api-key"
 
 def generate_payload(schema):
     """
-    Generates a payload using OpenAI's GPT model based on the provided OpenAPI schema.
-
-    Args:
-    - schema (dict): The OpenAPI schema for the API request.
-
-    Returns:
-    - dict: The generated payload.
+    Generates a JSON payload using OpenAI based on the schema definition.
     """
-    # Example logic for generating payload from schema using GPT (simplified)
-    prompt = f"Generate a payload for the following OpenAPI schema:\n{json.dumps(schema, indent=2)}"
-    
+    prompt = f"Given the following JSON schema, produce a valid JSON payload:\n{json.dumps(schema, indent=2)}"
     response = openai.Completion.create(
         engine="text-davinci-003",
         prompt=prompt,
         max_tokens=150
     )
-
-    payload = response.choices[0].text.strip()
-    return json.loads(payload)
+    payload_text = response.choices[0].text.strip()
+    try:
+        payload = json.loads(payload_text)
+    except Exception as e:
+        payload = {}  # Fallback
+    return payload
 
 def fill_payload_with_ids(payload, created_ids):
     """
-    Replaces placeholders in the payload with real IDs from created resources.
-
-    Args:
-    - payload (dict): The API request payload.
-    - created_ids (dict): A dictionary mapping resource names to created IDs.
-
-    Returns:
-    - dict: The updated payload with IDs inserted.
+    Replaces placeholders in the payload (e.g., {pet_id}) using the created_ids dictionary.
     """
-    for key, value in payload.items():
-        if isinstance(value, str) and "{" in value:
-            for resource, created_id in created_ids.items():
-                placeholder = f"{{{resource}}}"
-                if placeholder in value:
-                    payload[key] = value.replace(placeholder, str(created_id))
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            if isinstance(value, str) and "{" in value:
+                for placeholder, real_value in created_ids.items():
+                    payload[key] = value.replace(f"{{{placeholder}}}", str(real_value))
     return payload
