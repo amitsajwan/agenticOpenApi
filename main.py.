@@ -1,28 +1,35 @@
 # main.py
 import os
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from websocket_manager import WebSocketManager
 from agentic_api_planner import AgenticAPIPlanner
 from load_test import run_load_test
 from spec_input_manager import SpecInputManager
 
-load_dotenv()  # Load environment variables
+load_dotenv()
 
 app = FastAPI()
 ws_manager = WebSocketManager()
 
-BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
-# We no longer hardcode SPEC_PATH since we want user input.
+# Serve static files (like index.html) from the "static" directory
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Initialize SpecInputManager; the spec starts unloaded.
+# Serve index.html at the root path
+@app.get("/", response_class=HTMLResponse)
+async def serve_homepage():
+    with open("static/index.html", "r", encoding="utf-8") as f:
+        return f.read()
+
+BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
+
 spec_manager = SpecInputManager()
-# The planner will be initialized later using the loaded spec.
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await ws_manager.connect(websocket)
-    # Prompt for API spec input if not loaded.
     if not spec_manager.is_loaded():
         await ws_manager.send_message(
             "No API specification loaded. Please provide the API spec input in the following format: "
@@ -32,7 +39,6 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             data = await websocket.receive_text()
-            # If spec is not loaded, treat incoming message as spec input.
             if not spec_manager.is_loaded():
                 if "::" in data:
                     source_type, spec_input = data.split("::", 1)
@@ -43,11 +49,10 @@ async def websocket_endpoint(websocket: WebSocket):
                         await ws_manager.send_message(f"Error loading spec: {result}", msg_type="bot")
                 else:
                     await ws_manager.send_message(
-                        "Invalid input format. Please provide input as 'url::<spec_url>' or 'file::<file_path>' or 'text::<raw_spec>'.",
+                        "Invalid input format. Use 'url::<spec_url>' or 'file::<file_path>' or 'text::<raw_spec>'.",
                         msg_type="bot"
                     )
             else:
-                # Once spec is loaded, echo the command (or process further).
                 await ws_manager.send_message(f"Received command: {data}", msg_type="user")
     except Exception as e:
         await ws_manager.disconnect(websocket)
@@ -56,9 +61,7 @@ async def websocket_endpoint(websocket: WebSocket):
 async def plan_execution():
     if not spec_manager.is_loaded():
         return {"error": "API specification is not loaded yet."}
-    # Initialize planner with the loaded spec
     api_planner = AgenticAPIPlanner(openapi_spec_path="")
-    # Override the spec with the loaded spec
     api_planner.openapi_spec = spec_manager.spec
     sequence = api_planner.generate_execution_plan()
     return {"message": "API sequence generated", "sequence": sequence}
@@ -69,14 +72,3 @@ async def load_test_endpoint(users: int = 10):
         return {"error": "API specification is not loaded yet."}
     await run_load_test(users=users)
     return {"message": "Load test initiated"}
-
-
-
-# Serve static files (like index.html) from the "static" directory
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# Serve index.html at the root path
-@app.get("/", response_class=HTMLResponse)
-async def serve_homepage():
-    with open("static/index.html", "r", encoding="utf-8") as f:
-        return f.read()
