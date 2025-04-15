@@ -1,9 +1,11 @@
+# main.py
 import os
 from fastapi import FastAPI, WebSocket
 from dotenv import load_dotenv
 from websocket_manager import WebSocketManager
 from agentic_api_planner import AgenticAPIPlanner
 from load_test import run_load_test
+from spec_input_manager import SpecInputManager
 
 load_dotenv()  # Load environment variables
 
@@ -11,29 +13,59 @@ app = FastAPI()
 ws_manager = WebSocketManager()
 
 BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
-SPEC_PATH = os.getenv("SPEC_PATH", "specs/petstore.yaml")
+# We no longer hardcode SPEC_PATH since we want user input.
 
-# Initialize planner with the production-ready spec
-api_planner = AgenticAPIPlanner(openapi_spec_path=SPEC_PATH)
+# Initialize SpecInputManager; the spec starts unloaded.
+spec_manager = SpecInputManager()
+# The planner will be initialized later using the loaded spec.
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await ws_manager.connect(websocket)
+    # Prompt for API spec input if not loaded.
+    if not spec_manager.is_loaded():
+        await ws_manager.send_message(
+            "No API specification loaded. Please provide the API spec input in the following format: "
+            "'<source_type>::<spec_input>' where source_type can be 'file', 'url', or 'text'.",
+            msg_type="bot"
+        )
     try:
         while True:
             data = await websocket.receive_text()
-            # Here you can add processing logic to interpret user commands
-            await ws_manager.send_message(f"Received: {data}", msg_type="user")
+            # If spec is not loaded, treat incoming message as spec input.
+            if not spec_manager.is_loaded():
+                if "::" in data:
+                    source_type, spec_input = data.split("::", 1)
+                    success, result = spec_manager.load_spec_from_input(spec_input.strip(), source_type.strip().lower())
+                    if success:
+                        await ws_manager.send_message("API specification loaded successfully.", msg_type="bot")
+                    else:
+                        await ws_manager.send_message(f"Error loading spec: {result}", msg_type="bot")
+                else:
+                    await ws_manager.send_message(
+                        "Invalid input format. Please provide input as 'url::<spec_url>' or 'file::<file_path>' or 'text::<raw_spec>'.",
+                        msg_type="bot"
+                    )
+            else:
+                # Once spec is loaded, echo the command (or process further).
+                await ws_manager.send_message(f"Received command: {data}", msg_type="user")
     except Exception as e:
         await ws_manager.disconnect(websocket)
 
 @app.post("/plan_execution")
 async def plan_execution():
+    if not spec_manager.is_loaded():
+        return {"error": "API specification is not loaded yet."}
+    # Initialize planner with the loaded spec
+    api_planner = AgenticAPIPlanner(openapi_spec_path="")
+    # Override the spec with the loaded spec
+    api_planner.openapi_spec = spec_manager.spec
     sequence = api_planner.generate_execution_plan()
     return {"message": "API sequence generated", "sequence": sequence}
 
 @app.post("/load_test")
 async def load_test_endpoint(users: int = 10):
-    # Run load test asynchronously
+    if not spec_manager.is_loaded():
+        return {"error": "API specification is not loaded yet."}
     await run_load_test(users=users)
     return {"message": "Load test initiated"}
