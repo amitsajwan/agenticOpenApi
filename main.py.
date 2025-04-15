@@ -69,3 +69,14 @@ async def load_test_endpoint(users: int = 10):
         return {"error": "API specification is not loaded yet."}
     await run_load_test(users=users)
     return {"message": "Load test initiated"}
+
+
+
+# Serve static files (like index.html) from the "static" directory
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Serve index.html at the root path
+@app.get("/", response_class=HTMLResponse)
+async def serve_homepage():
+    with open("static/index.html", "r", encoding="utf-8") as f:
+        return f.read()
