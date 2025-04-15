@@ -1,28 +1,31 @@
-import openai
+import os
 import json
+from langchain.chat_models.azure import AzureChatOpenAI
 
-openai.api_key = "your-openai-api-key"
+# Initialize Azure Chat model for payload generation
+azure_model = AzureChatOpenAI(
+    endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    key=os.getenv("AZURE_OPENAI_KEY"),
+    deployment_id=os.getenv("AZURE_OPENAI_DEPLOYMENT_ID"),
+    api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2023-06-01-preview"),
+    temperature=0.7,
+)
 
 def generate_payload(schema):
     """
-    Generates a JSON payload using OpenAI based on the schema definition.
+    Generate a JSON payload using AzureChatOpenAI given a JSON schema.
     """
-    prompt = f"Given the following JSON schema, produce a valid JSON payload:\n{json.dumps(schema, indent=2)}"
-    response = openai.Completion.create(
-        engine="text-davinci-003",
-        prompt=prompt,
-        max_tokens=150
-    )
-    payload_text = response.choices[0].text.strip()
+    prompt = f"Generate a valid JSON payload for the following schema:\n{json.dumps(schema, indent=2)}"
+    response = azure_model.invoke_as_llm(prompt)
     try:
-        payload = json.loads(payload_text)
+        payload = json.loads(response.strip())
     except Exception as e:
-        payload = {}  # Fallback
+        payload = {}  # Fallback default payload
     return payload
 
 def fill_payload_with_ids(payload, created_ids):
     """
-    Replaces placeholders in the payload (e.g., {pet_id}) using the created_ids dictionary.
+    Replace placeholders in the payload (e.g., '{pet_id}') with actual values.
     """
     if isinstance(payload, dict):
         for key, value in payload.items():

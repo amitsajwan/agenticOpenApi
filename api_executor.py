@@ -9,8 +9,7 @@ class APIExecutor:
         self.state = State()
 
     def execute_api(self, method, path, payload=None):
-        url = self.base_url + path
-        response = None
+        url = f"{self.base_url}{path}"
         try:
             if method.upper() == "GET":
                 response = requests.get(url, headers=self.headers)
@@ -32,7 +31,6 @@ class APIExecutor:
         while attempt < retries:
             try:
                 result = self.execute_api(method, path, payload)
-                # Update state if API returns an ID
                 if isinstance(result, dict) and "id" in result:
                     self.state.update_state(path, result)
                 return result

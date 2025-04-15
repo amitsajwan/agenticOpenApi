@@ -2,9 +2,9 @@ import yaml
 
 def parse_openapi_spec(spec_path):
     """
-    Parses the OpenAPI spec YAML file and returns the specification.
+    Parse the OpenAPI YAML file and return the parsed spec.
+    For full $ref resolution, consider a library like 'prance'.
     """
-    with open(spec_path, "r") as spec_file:
-        spec = yaml.safe_load(spec_file)
-    # (Optional) Process $ref resolutions here or use an external tool
+    with open(spec_path, "r") as f:
+        spec = yaml.safe_load(f)
     return spec

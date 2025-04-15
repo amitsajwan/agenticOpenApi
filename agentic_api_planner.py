@@ -1,18 +1,26 @@
-import openai
+import os
 import json
 from langgraph import LangGraph
 from openapi_parser import parse_openapi_spec
 
-# Set your OpenAI API key via env variable ideally
-openai.api_key = "your-openai-api-key"
+# Use AzureChatOpenAI via LangChain
+from langchain.chat_models.azure import AzureChatOpenAI
+
+# Initialize Azure Chat model using environment variables
+azure_model = AzureChatOpenAI(
+    endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    key=os.getenv("AZURE_OPENAI_KEY"),
+    deployment_id=os.getenv("AZURE_OPENAI_DEPLOYMENT_ID"),
+    api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2023-06-01-preview"),
+    temperature=0.7,
+)
 
 class AgenticAPIPlanner:
     def __init__(self, openapi_spec_path):
         self.openapi_spec = parse_openapi_spec(openapi_spec_path)
-        self.langgraph = LangGraph()  # Assuming LangGraph is properly configured
+        self.langgraph = LangGraph()
 
     def extract_endpoints(self):
-        # Extract endpoints with their HTTP methods from the spec
         endpoints = []
         for path, methods in self.openapi_spec.get("paths", {}).items():
             for method in methods.keys():
@@ -21,23 +29,23 @@ class AgenticAPIPlanner:
 
     def generate_execution_plan(self):
         endpoints = self.extract_endpoints()
-        # Create a basic sequence using LangGraph (for demo, sort by method type)
+        # Create a baseline sequence: For example, POST first then others.
         sequence = sorted(endpoints, key=lambda x: x["method"] != "POST")
         
-        # Use OpenAI to optimize the sequence
-        prompt = f"Optimize the following API sequence for dependency resolution:\n{json.dumps(sequence, indent=2)}"
-        response = openai.Completion.create(
-            engine="text-davinci-003",
-            prompt=prompt,
-            max_tokens=300,
-            temperature=0.7
+        # Use AzureChatOpenAI to refine the sequence.
+        prompt = (
+            "Optimize the following API sequence for dependency resolution and efficiency. "
+            "Consider that POST requests must precede GET/PUT/DELETE calls that require their IDs:\n"
+            f"{json.dumps(sequence, indent=2)}"
         )
+        # Get the completion
+        response = azure_model.invoke_as_llm(prompt)
         try:
-            optimized = json.loads(response.choices[0].text.strip())
+            optimized_sequence = json.loads(response.strip())
         except Exception as e:
-            optimized = sequence  # Fallback to the basic sequence
-        return optimized
+            optimized_sequence = sequence  # Fallback if parsing fails
+        return optimized_sequence
 
     def finalize_sequence(self, user_sequence):
-        # Here, one can integrate user modifications
+        # Process user modifications; for production, you could merge changes with automated plan.
         return user_sequence

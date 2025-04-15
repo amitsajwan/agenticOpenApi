@@ -4,49 +4,43 @@ body {
     margin: 0;
     padding: 0;
 }
-
 #container {
     display: flex;
     justify-content: space-between;
     padding: 20px;
 }
-
 #chat-container, #dag-container {
     width: 48%;
-    padding: 20px;
+    background-color: #fff;
     border-radius: 10px;
-    background-color: white;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
 }
-
-#chat-container {
-    height: 400px;
-    overflow-y: auto;
-}
-
 #messages {
-    margin-bottom: 20px;
+    height: 300px;
+    overflow-y: scroll;
+    border: 1px solid #ddd;
+    padding: 10px;
+    margin-bottom: 10px;
 }
-
 #user-input {
     width: 80%;
     padding: 10px;
-    margin-right: 10px;
 }
-
 #send-btn {
     padding: 10px 20px;
     background-color: #007BFF;
-    color: white;
+    color: #fff;
     border: none;
     cursor: pointer;
 }
-
-#send-btn:hover {
-    background-color: #0056b3;
-}
-
-h2 {
+.dag-node {
+    width: 120px;
+    height: 50px;
+    background-color: #007BFF;
+    color: #fff;
     text-align: center;
-    color: #333;
+    line-height: 50px;
+    border-radius: 5px;
+    cursor: move;
 }

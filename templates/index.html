@@ -3,57 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agentic OpenAPI Framework</title>
+    <title>Agentic OpenAPI Tester</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <div id="container">
-        <!-- Chat UI -->
         <div id="chat-container">
             <h2>Chat with Agent</h2>
             <div id="chat-box">
                 <div id="messages"></div>
             </div>
-            <input type="text" id="user-input" placeholder="Ask me something...">
+            <input type="text" id="user-input" placeholder="Type your message...">
             <button id="send-btn">Send</button>
         </div>
-
-        <!-- DAG UI -->
         <div id="dag-container">
             <h2>API Execution Flow</h2>
             <div id="dag"></div>
         </div>
     </div>
-
     <script src="/static/dag.js"></script>
     <script>
-        const sendButton = document.getElementById("send-btn");
-        const userInputField = document.getElementById("user-input");
-        const messagesContainer = document.getElementById("messages");
+        const sendBtn = document.getElementById("send-btn");
+        const userInput = document.getElementById("user-input");
+        const messages = document.getElementById("messages");
+        const ws = new WebSocket("ws://" + window.location.host + "/ws");
 
-        const ws = new WebSocket("ws://localhost:8000/chat");
-
-        // WebSocket message listener
         ws.onmessage = function(event) {
-            const message = event.data;
-            const messageElement = document.createElement("div");
-            messageElement.textContent = message;
-            messagesContainer.appendChild(messageElement);
+            let data = JSON.parse(event.data);
+            let msgElem = document.createElement("div");
+            msgElem.textContent = data.message;
+            messages.appendChild(msgElem);
         };
 
-        // Send user input to the server
-        sendButton.addEventListener("click", function() {
-            const userInput = userInputField.value;
-            if (userInput.trim()) {
-                ws.send(userInput);
-                userInputField.value = "";
-            }
-        });
-
-        // Add keyboard support
-        userInputField.addEventListener("keydown", function(event) {
-            if (event.key === "Enter") {
-                sendButton.click();
+        sendBtn.addEventListener("click", () => {
+            if (userInput.value.trim()) {
+                ws.send(userInput.value);
+                userInput.value = "";
             }
         });
     </script>
