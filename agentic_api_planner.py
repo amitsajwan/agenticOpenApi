@@ -1,19 +1,18 @@
 import os
 import json
 import re
-from langchain.chat_models.azure import AzureChatOpenAI
-from langchain.schema import HumanMessage
+from langchain_openai import AzureChatOpenAI
+from langchain_core.messages import HumanMessage
 from openapi_parser import parse_openapi_spec
 
 class AgenticAPIPlanner:
     def __init__(self, openapi_spec_path):
         self.openapi_spec = parse_openapi_spec(openapi_spec_path)
         self.azure_model = AzureChatOpenAI(
-            endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-            key=os.getenv("AZURE_OPENAI_KEY"),
-            deployment_id=os.getenv("AZURE_OPENAI_DEPLOYMENT_ID"),
-            api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2023-06-01-preview"),
+            azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT_ID"),
+            api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2023-12-01-preview"),
             temperature=0.7,
+            max_tokens=1000
         )
 
     def extract_endpoints(self):

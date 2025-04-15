@@ -1,26 +1,10 @@
-# LangChain Core and Community Packages
-langchain-core
-langchain-community
-
-# Web Framework
+langchain-openai
+langgraph
 fastapi
 uvicorn
-
-# WebSocket Support
 websockets
-
-# YAML and JSON Parsing
 pyyaml
 jsonschema
-
-# HTTP Requests
 httpx
-
-# Environment Variable Management
 python-dotenv
-
-# Asynchronous Support
 aiohttp
-
-# Optional: For Frontend Development (if applicable)
-# jinja2
