@@ -1,0 +1,23 @@
+from fastapi import FastAPI
+from fastapi.websockets import WebSocket
+from websocket_manager import WebSocketManager
+from agentic_api_planner import AgenticAPIPlanner
+from load_test import load_test
+
+app = FastAPI()
+ws_manager = WebSocketManager()
+api_planner = AgenticAPIPlanner()
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await ws_manager.connect(websocket)
+
+@app.post("/plan_execution")
+async def plan_api_execution():
+    api_sequence = api_planner.generate_sequence()
+    return {"message": "API sequence generated", "sequence": api_sequence}
+
+@app.post("/load_test")
+async def perform_load_test(users: int = 10):
+    load_test(users=users)
+    return {"message": "Load test started"}
